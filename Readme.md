@@ -1,280 +1,119 @@
-# AWS Application Load Balancer Project
+# AWS Auto Scaling Group with Elastic Load Balancer
 
----
-# Introduction
+This project demonstrates a **highly available and auto-scaling web infrastructure** on AWS using **EC2 Launch Templates**, **Auto Scaling Groups (ASG)**, **Target Groups**, and an **Application Load Balancer (ALB)**.
 
-This project demonstrates how to configure an AWS Application Load Balancer (ALB) with multiple EC2 instances and target groups.
+## 🏗️ Architecture Overview
 
-Different applications are hosted on separate EC2 instances, and the Application Load Balancer routes traffic based on URL paths such as `/mobile` and `/laptop`.
+Three independent applications (**Home**, **Laptop**, **Mobile**) were each deployed with their own:
+- Launch Template (defines AMI, instance type, and bootstrap script)
+- Auto Scaling Group (maintains desired instance count and health)
+- Target Group (routes traffic to healthy instances)
 
-This is an extended architecture project where multiple EC2 servers are attached to each service for better scalability and high availability.
+All three Target Groups are connected to a single **Application Load Balancer**, which distributes incoming traffic across the instances.
 
-The Application Load Balancer distributes incoming traffic between multiple servers using the Round Robin algorithm.
+## ⚙️ Steps Performed
 
-This project helps in understanding:
-- AWS Load Balancer
-- Target Groups
-- Path-Based Routing
-- Round Robin Technique
-- EC2 Integration
-- High Availability Architecture
-- Traffic Distribution
+### 1. Created Launch Templates
+Launch templates were created for each application with a user-data bootstrap script that installs and starts Apache (`httpd`) and serves a custom HTML page identifying the instance.
 
----
-
-# Architecture
-
-```text
-                    User Browser
-                          │
-                          ▼
-             Application Load Balancer
-                          │
-        ┌─────────────────┼─────────────────┐
-        │                 │                 │
-        ▼                 ▼                 ▼
-
-     Home TG          Mobile TG         Laptop TG
-        │                 │                 │
-   ┌────┴────┐       ┌────┴────┐       ┌────┴────┐
-   ▼         ▼       ▼         ▼       ▼         ▼
-
- Home-1   Home-2   Mobile-1  Mobile-2 Laptop-1 Laptop-2
-  EC2       EC2      EC2       EC2      EC2      EC2
+```bash
+#!/bin/bash
+yum update -y
+yum install httpd -y
+systemctl start httpd
+systemctl enable httpd
+echo "<h1> This is Home Page $(hostname) </h1>" > /var/www/html/index.html
 ```
 
----
+![Launch Template User Data Script](img/LT.png)
 
-# AWS Services Used
+Three launch templates were created — `Home-LT`, `Laptop-LT`, and `Mobile-LT`:
+
+![Launch Templates](img/datascript.png)
+
+### 2. Created Auto Scaling Groups
+Each launch template was attached to its own Auto Scaling Group (`Home-ASG`, `Laptop-ASG`, `Mobile-ASG`), which automatically launches and maintains EC2 instances at the desired capacity.
+
+![Auto Scaling Groups](img/Autoscaling.png)
+
+### 3. Verified EC2 Instances
+All EC2 instances launched by the Auto Scaling Groups were running and passed status checks.
+
+![EC2 Instances](img/EC2.png)
+
+### 4. Created Target Groups
+A Target Group was created for each application (`Home-TG`, `Laptop-TG`, `Mobile-TG`) to route HTTP traffic to the healthy instances.
+
+![Target Groups](img/target-groups.png)
+
+### 5. Created Application Load Balancer
+An Application Load Balancer (`Application-LB`) was created as an internet-facing load balancer to distribute traffic across the target groups.
+
+![Load Balancer](img/load-balancer.png)
+
+
+
+## ✅ Result
+
+- Fully automated instance provisioning via Launch Templates
+- Self-healing infrastructure via Auto Scaling Groups
+- Traffic distribution and health checks via Target Groups
+- Single entry point for users via the Application Load Balancer
+
+## 🛠️ AWS Services Used
 
 | Service | Purpose |
 |---|---|
-| EC2 | Hosting Applications |
-| Application Load Balancer | Traffic Distribution |
-| Target Groups | Route Requests |
-| Security Groups | Allow HTTP Traffic |
+| EC2 | Virtual servers hosting the web application |
+| Launch Templates | Reusable instance configuration + bootstrap script |
+| Auto Scaling Groups | Automatic scaling and self-healing of instances |
+| Target Groups | Health checks and traffic routing |
+| Application Load Balancer | Distributes incoming traffic across instances |
 
----
 
-# Project Structure
+**Home Page** — `application-lb-306224537.us-east-1.elb.amazonaws.com`
 
-```text
-AWS Cloud
-│
-├── Application Load Balancer
-│
-├── Target Groups
-│   │
-│   ├── home-tg
-│   │     ├── home-server-1
-│   │     └── home-server-2
-│   │
-│   ├── mobile-tg
-│   │     ├── mobile-server-1
-│   │     └── mobile-server-2
-│   │
-│   └── laptop-tg
-│         ├── laptop-server-1
-│         └── laptop-server-2
-│
-└── Listener Rules
-      ├── /mobile/*
-      ├── /laptop/*
-      └── default → home-tg
-```
+![Home Page Output](img/home.png)
 
----
+**Laptop Page** — `application-lb-306224537.us-east-1.elb.amazonaws.com/laptop/`
 
-# Step 1 — Launch EC2 Instances
+![Laptop Page Output](img/laptop.png)
 
-Launch six EC2 instances:
+**Mobile Page** — `application-lb-306224537.us-east-1.elb.amazonaws.com/mobile/`
 
-| Service | Instances |
+![Mobile Page Output](img/mobile.png)
+
+## ✅ Result
+
+- Fully automated instance provisioning via Launch Templates
+- Self-healing infrastructure via Auto Scaling Groups
+- Traffic distribution and health checks via Target Groups
+- Single entry point for users via the Application Load Balancer
+
+## 🛠️ AWS Services Used
+
+| Service | Purpose |
 |---|---|
-| Home | 2 EC2 Servers |
-| Mobile | 2 EC2 Servers |
-| Laptop | 2 EC2 Servers |
+| EC2 | Virtual servers hosting the web application |
+| Launch Templates | Reusable instance configuration + bootstrap script |
+| Auto Scaling Groups | Automatic scaling and self-healing of instances |
+| Target Groups | Health checks and traffic routing |
+| Application Load Balancer | Distributes incoming traffic across instances |
 
-Use:
-- Amazon Linux 2023
-- t3.micro instance type
+## 📂 Project Structure
 
-Allow ports:
-- SSH → 22
-- HTTP → 80
-
----
-
-# Step 2 — Create Target Groups
-
-Create three target groups:
-
-| Target Group | EC2 Instances |
-|---|---|
-| home-tg | home-server-1, home-server-2 |
-| mobile-tg | mobile-server-1, mobile-server-2 |
-| laptop-tg | laptop-server-1, laptop-server-2 |
-
-Protocol:
-- HTTP
-
-Port:
-- 80
-
-Target Type:
-- Instance
-
----
-
-# Step 3 — Create Application Load Balancer
-
-Create an Application Load Balancer with:
-
-- Internet Facing
-- HTTP Listener on Port 80
-- Attach all target groups
-
----
-
-# Step 4 — Configure Listener Rules
-
-Add path-based routing rules:
-
-| Path | Target Group |
-|---|---|
-| /mobile/* | mobile-tg |
-| /laptop/* | laptop-tg |
-| Default | home-tg |
-
----
-
-# Round Robin Technique
-
-The Application Load Balancer uses the Round Robin algorithm to distribute incoming requests equally among multiple EC2 instances inside a target group.
-
-Example:
-
-- First request → home-server-1
-- Second request → home-server-2
-- Third request → home-server-1
-- Fourth request → home-server-2
-
-This technique helps in:
-- Load Distribution
-- Better Performance
-- High Availability
-- Reduced Server Load
-- Improved Scalability
-
----
-
-# Application URLs
-
-## Home Page
-
-```text
-http://application-lb-dns-name/
 ```
-
----
-
-## Mobile Page
-
-```text
-http://application-lb-dns-name/mobile/
+project/
+├── README.md
+└── images/
+    ├── launch-template-userdata.png
+    ├── launch-templates.png
+    ├── auto-scaling-groups.png
+    ├── ec2-instances.png
+    ├── target-groups.png
+    ├── load-balancer.png
+    ├── auto-scaling-groups-scaled.png
+    ├── home-page-output.png
+    ├── laptop-page-output.png
+    └── mobile-page-output.png
 ```
-
----
-
-## Laptop Page
-
-```text
-http://application-lb-dns-name/laptop/
-```
-
----
-
-# Screenshots
-
-## EC2 Running Instances
-
-[![EC2 Instances](img/ec2.png)](img/ec2.png)
-```
-
----
-## Home Page Output
-```
-
-[![Home Page](img/home.png)](img/home.png)
-```
-
-## Mobile Page Output
-```
-
-[![Mobile Page](img/mobile.png)](img/mobile.png)
-```
-## Laptop Page Output
-```
-
-[![Laptop Page](img/laptop.png)](img/laptop.png)
-```
-
-
-## Load Balancer Listener Rules
-```
-
-[![Listener Rules](img/lb&rules.png)](img/lb-rules.png)
-```
-## Target Groups
-```
-
-[![Target Groups](img/tg.png)](img/tg.png)
-
----
-
-# Security Group Configuration
-
-| Type | Port |
-|---|---|
-| SSH | 22 |
-| HTTP | 80 |
-
----
-
-# Features
-
-- Application Load Balancer
-- Path-Based Routing
-- Multiple EC2 Instances
-- Round Robin Traffic Distribution
-- High Availability
-- Load Distribution
-- Scalable Architecture
-- Centralized Access
-
----
-
-# Future Improvements
-
-- HTTPS SSL Configuration
-- Auto Scaling Group
-- Route53 Domain Setup
-- Jenkins CI/CD Integration
-- Docker Deployment
-- Monitoring using CloudWatch
-
----
-
-# Author
-
-## Harsh Batham
-
-Cloud and DevOps Engineer
-
----
-
-# Summary
-
-This project successfully demonstrates implementation of an AWS Application Load Balancer with multiple EC2 instances and target groups. Separate target groups were created for Home, Mobile, and Laptop services, with two EC2 servers attached to each group for high availability and scalability. The Application Load Balancer distributed traffic using path-based routing and the Round Robin technique, providing efficient traffic management and balanced server utilization in a cloud environment.
-
----
